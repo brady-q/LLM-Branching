@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f3f5f2;
+  --color-surface: #ffffff;
+  --color-ink: #1c2621;
+  --color-muted: #6b7a71;
+  --color-line: #d9dfda;
+  --color-moss: #3d7a5c;
+  --color-moss-deep: #2c5b44;
+  --color-moss-soft: #e3eee7;
+  --color-graft: #5b5bd6;
+  --color-graft-soft: #ecebfb;
+  --color-rust: #b42318;
+  --color-rust-soft: #fce9e7;
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html, body, #root { height: 100%; }
+body { background: var(--color-paper); color: var(--color-ink); -webkit-font-smoothing: antialiased; }
+
+@layer components {
+  .btn {
+    @apply rounded-full border border-line bg-surface px-3 py-1 text-sm text-ink transition-colors hover:border-moss/50 hover:bg-moss-soft/50 disabled:opacity-40 disabled:hover:border-line disabled:hover:bg-surface;
+  }
+  .btn-primary {
+    @apply rounded-full bg-moss px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-moss-deep disabled:opacity-40 disabled:hover:bg-moss;
+  }
+  .btn-ghost {
+    @apply rounded-full px-2.5 py-1 text-sm text-muted transition-colors hover:bg-ink/5 hover:text-ink;
+  }
+  :where(button, a, input, textarea, select):focus-visible {
+    @apply outline-2 outline-offset-2 outline-moss;
+  }
+}
+
+/* Markdown in assistant replies. */
+.markdown { line-height: 1.65; }
+.markdown > * + * { margin-top: 0.7em; }
+.markdown ul { list-style: disc; padding-left: 1.3em; }
+.markdown ol { list-style: decimal; padding-left: 1.3em; }
+.markdown li::marker { color: var(--color-muted); }
+.markdown h1, .markdown h2, .markdown h3 { font-weight: 650; margin-top: 1.1em; letter-spacing: -0.01em; }
+.markdown h1 { font-size: 1.25em; }
+.markdown h2 { font-size: 1.12em; }
+.markdown code { font-family: var(--font-mono); background: var(--color-moss-soft); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.86em; }
+.markdown pre { background: #1c2621; color: #e4ece6; padding: 0.9em 1em; border-radius: 10px; overflow-x: auto; }
+.markdown pre code { background: none; padding: 0; color: inherit; }
+.markdown a { color: var(--color-moss-deep); text-decoration: underline; text-underline-offset: 2px; }
+.markdown blockquote { border-left: 2px solid var(--color-line); padding-left: 0.9em; color: var(--color-muted); }
+.markdown table { border-collapse: collapse; }
+.markdown th, .markdown td { border: 1px solid var(--color-line); padding: 0.25em 0.6em; }
+
+/* React Flow chrome to match. */
+.react-flow__controls { box-shadow: none; border: 1px solid var(--color-line); border-radius: 10px; overflow: hidden; }
+.react-flow__controls-button { background: var(--color-surface); border-bottom-color: var(--color-line); }
+.react-flow__controls-button:hover { background: var(--color-moss-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
