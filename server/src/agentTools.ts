@@ -134,6 +134,43 @@ export function nodeTitle(n: ChatNode): string {
   return `"${preview(n.userMessage, 40)}"`;
 }
 
+/**
+ * Streaming filter that replaces handles the model leaks into its reply ("n3")
+ * with how the UI names that node. The prompt forbids handles, but cheaper
+ * models still write them. Only known handles are replaced, so text like "N95"
+ * or "n100" (no such node) passes through. A trailing "n" or "n4" is held back
+ * until the next piece shows whether it continues ("n4" vs "n42").
+ */
+export function handleScrubber(handles: Handles, title: (id: NodeId) => string | undefined) {
+  let pending = '';
+  let prev = ''; // last character already emitted, for the word boundary
+  const replace = (s: string, before: string) =>
+    (before + s).replace(/(^|[^\w])(n\d+)\b/g, (all, pre: string, h: string) => {
+      const id = handles.resolve(h);
+      const t = id && title(id);
+      return t ? pre + t : all;
+    }).slice(before.length);
+  const emit = (s: string) => {
+    const out = replace(s, prev);
+    if (out) prev = out.at(-1)!;
+    return out;
+  };
+  return {
+    push(piece: string): string {
+      const text = pending + piece;
+      const tail = /(?:^|[^\w])(n\d*)$/.exec(text);
+      const cut = tail ? text.length - tail[1]!.length : text.length;
+      pending = text.slice(cut);
+      return emit(text.slice(0, cut));
+    },
+    flush(): string {
+      const out = emit(pending);
+      pending = '';
+      return out;
+    },
+  };
+}
+
 /** Compact text listing of the tree for the model. */
 export function treeOutline(index: GraphIndex, handles: Handles): string {
   const nodes = [...index.byId.values()].sort((a, b) => a.createdAt - b.createdAt);

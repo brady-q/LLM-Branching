@@ -12,7 +12,7 @@ npm run dev            # server :8787, client http://localhost:5173
 
 Set `MOCK_LLM=1` in `.env` to try the app without API calls: replies are fake echoes of the context the model would see.
 
-Other commands: `npm test` (graph logic tests), `npm run typecheck`.
+Other commands: `npm test` (graph logic tests), `npm run typecheck`, `npm run eval` (assistant evals, real API calls).
 
 ## Using it
 
@@ -24,6 +24,17 @@ Other commands: `npm test` (graph logic tests), `npm run typecheck`.
 ## How the assistant edits the tree
 
 Every chat reply runs as a tool-calling loop (`server/src/agent.ts`, max 8 tool rounds), streamed into the same node. Tools: `get_tree_outline`, `get_node`, `merge_nodes`, `delete_node`. The model sees an outline of the tree with short handles (`n1`, `n2`, …) instead of UUIDs. Every call is checked in `server/src/agentTools.ts` against the same rules as the UI (node exists in this tree, `validateMerge`, root can't be deleted) plus one more: the reply can't delete its own conversation. Invalid calls change nothing; the error goes back to the model so it can correct itself. Merges run in order and wait for their summary, so a merge result can be merged again (3+ branches). Each reply's actions are saved on its node (`actions`) and included in later context. Tests: `server/src/agentTools.test.ts`. With `MOCK_LLM=1` the assistant understands `merge n2 and n3` / `delete n4`.
+
+## Assistant evals
+
+`npm run eval` runs the tool-calling assistant against the real model (`CHAT_MODEL`, needs `OPENROUTER_API_KEY`) on scripted scenarios in `server/evals/cases.ts`: merge two/three branches, merge an existing merge, merge with a focus instruction, delete a branch or part of one, refuse to delete its own conversation, answer without tools, handle missing or ambiguous targets, ignore instructions planted in other branches, and read facts from another branch.
+
+Each case is a small tree with readable ids, a new message, and expectations. The agent runs against an in-memory tree (no DB; merges get a canned summary), then `server/evals/harness.ts` grades it:
+
+- deterministic: exactly the expected nodes deleted, the expected merges created, reply patterns, no handles (`n3`) leaked to the user, no failed tool calls
+- LLM judge (cases with a `rubric`): pass/fail on the reply
+
+Options: `--trials 5` (default 3, model is nondeterministic), `--filter delete` (name or tag), `--model <id>`, `--judge-model <id>`, `--no-judge`, `--concurrency 4`, `-v`. Results are saved to `eval-results/`. The harness itself is unit-tested with scripted models in `server/evals/harness.test.ts` (part of `npm test`).
 
 ## How context works
 

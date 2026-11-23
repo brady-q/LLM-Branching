@@ -7,7 +7,7 @@ import {
   type ChatNode,
   type ToolStep,
 } from '@llmb/shared';
-import { AGENT_TOOLS, executeTool, Handles, treeOutline, type TreeOps } from './agentTools';
+import { AGENT_TOOLS, executeTool, handleScrubber, Handles, nodeTitle, treeOutline, type TreeOps } from './agentTools';
 import { config } from './config';
 import * as repo from './db';
 import { abortGenerations, runGeneration, type StreamEvent } from './generation';
@@ -26,7 +26,11 @@ Tree rules:
 - delete_node removes the node and everything below it. Only delete what the user asked for. To remove a branch, delete the first node of that branch (the child of the split point), not the split point.
 - You cannot delete the conversation you are in (your reply and its ancestors).
 - If the request is ambiguous or nothing matches, change nothing and say what you found.
-- The user cannot see handles. In your reply, describe nodes by their content (e.g. "the pasta branch"), never as n3.`;
+- Count matters: if the user names a number of branches ("the two branches") and more than that match, ask which ones instead of guessing.
+- A merge summary is written by a separate step from the latest replies of each branch. Accept it; never delete and redo a merge you just made because of its summary.
+- Outline previews are cut short. When asked what was said in another branch, read it with get_node before answering; never guess.
+- The user cannot see handles. Everything you write is shown to the user, including text written before or between tool calls. Describe nodes by their content (e.g. "the pasta branch", "the vegetarian step"), never as n3, n4, etc.
+- Don't narrate tool use ("let me look at the tree", "the tips are n4 and n6"). Call the tools without commentary, then write one reply that says what you did.`;
 
 export interface ChatTurn {
   node: ChatNode;
@@ -96,13 +100,20 @@ export async function runChatTurn(t: ChatTurn): Promise<string> {
     t.onToken(piece);
   };
   const steps: ToolStep[] = [];
+  // Safety net for handles the model writes despite the prompt. Deleted nodes keep their title.
+  const scrub = handleScrubber(handles, (id) => {
+    const n = ops.nodes().find((x) => x.id === id) ?? index.byId.get(id);
+    return n && nodeTitle(n);
+  });
+  const emitText = (s: string) => s && onToken(s);
 
   for (let round = 0; ; round++) {
     const turn = await streamTurn(
       { model: t.model, system, messages, tools: AGENT_TOOLS, toolChoice: round < MAX_STEPS ? 'auto' : 'none' },
-      onToken,
+      (piece) => emitText(scrub.push(piece)),
       t.signal,
     );
+    emitText(scrub.flush());
     if (!turn.toolCalls.length || round >= MAX_STEPS) break;
     messages.push({ role: 'assistant', content: turn.text, toolCalls: turn.toolCalls });
     // In order: a later call may depend on an earlier one (merge, then merge the result).

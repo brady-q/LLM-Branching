@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { ChatNode, NodeId } from '@llmb/shared';
-import { executeTool, Handles, type TreeOps } from './agentTools';
+import { executeTool, handleScrubber, Handles, type TreeOps } from './agentTools';
 
 let clock = 0;
 const base = { treeId: 't', userMessage: '', assistantMessage: '' };
@@ -144,4 +144,23 @@ test('malformed arguments and unknown tools are errors, not crashes', async () =
   expect((await run('delete_node', '[1,2]')).ok).toBe(false);
   expect((await run('drop_database', {})).result).toContain('Unknown tool');
   expect(tree.removed).toEqual([]);
+});
+
+describe('handleScrubber', () => {
+  const scrubAll = (pieces: string[]) => {
+    const s = handleScrubber(tree.handles, (id) => `<${id}>`);
+    return pieces.map((p) => s.push(p)).join('') + s.flush();
+  };
+
+  test('replaces known handles, even split across pieces', () => {
+    expect(scrubAll(['The branch n3 and `n5`.'])).toBe('The branch <b> and `<d>`.');
+    expect(scrubAll(['see n', '3', ' then n', '5'])).toBe('see <b> then <d>');
+    expect(scrubAll(['(n2 → n', '3 →', ' n4)'])).toBe('(<a> → <b> → <c>)');
+  });
+
+  test('leaves other text alone', () => {
+    expect(scrubAll(['wear an N95 or n95; open in', ' n99 and in3 now'])).toBe('wear an N95 or n95; open in n99 and in3 now');
+    expect(scrubAll(['plain text'])).toBe('plain text');
+    expect(scrubAll(['ends in n'])).toBe('ends in n');
+  });
 });
